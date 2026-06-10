@@ -1,355 +1,95 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AI TTS 음성 변환기</title>
-  <style>
-    * { box-sizing: border-box; }
+// --- Google Apps Script / OpenAI 연동 및 자동 변환 기능 ---
+askAiBtn.addEventListener('click', async () => {
+  const q = aiQuestion.value.trim();
+  if(!q) { alert('질문을 입력하세요.'); return; }
+  if(GAS_WEB_APP_URL.includes('YOUR_GOOGLE')) { alert('Google Apps Script 웹 앱 URL 주소를 입력해 주세요.'); return; }
 
-    body {
-      margin: 0;
-      min-height: 100vh;
-      background: linear-gradient(135deg, #e3f2fd, #fce4ec);
-      font-family: Arial, sans-serif;
-      color: #333;
-    }
+  try {
+    // 버튼 비활성화 및 상태 표시
+    askAiBtn.disabled = true;
+    ttsBtn.disabled = true;
+    aiAnswer.textContent = "AI 답변 생성 중입니다. 잠시만 기다려주세요...";
+    setStatus('Apps Script API와 통신 중...');
 
-    .container {
-      width: min(900px, 92%);
-      margin: 40px auto;
-      background: #ffffff;
-      border-radius: 24px;
-      padding: 28px;
-      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.16);
-    }
-
-    h1 {
-      margin: 0 0 8px;
-      text-align: center;
-      font-size: 28px;
-    }
-
-    .subtitle {
-      text-align: center;
-      color: #777;
-      margin-bottom: 24px;
-      font-size: 14px;
-    }
-
-    .info {
-      padding: 14px;
-      margin-bottom: 20px;
-      border-radius: 14px;
-      background: #e8f5e9;
-      color: #2e7d32;
-      font-size: 14px;
-      line-height: 1.6;
-    }
-
-    .option-box {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 10px;
-      margin-bottom: 14px;
-    }
-
-    select, input {
-      height: 44px;
-      padding: 0 12px;
-      border: 1px solid #ddd;
-      border-radius: 12px;
-      font-size: 14px;
-      outline: none;
-    }
-
-    textarea {
-      width: 100%;
-      min-height: 180px;
-      resize: vertical;
-      padding: 16px;
-      border: 1px solid #ddd;
-      border-radius: 16px;
-      font-size: 16px;
-      line-height: 1.5;
-      outline: none;
-      font-family: Arial, sans-serif;
-    }
-
-    textarea:focus, select:focus, input:focus {
-      border-color: #42a5f5;
-      box-shadow: 0 0 0 3px rgba(66, 165, 245, 0.15);
-    }
-
-    .label {
-      font-weight: bold;
-      margin-bottom: 6px;
-    }
-
-    .button-row {
-      display: flex;
-      gap: 10px;
-      justify-content: flex-end;
-      flex-wrap: wrap;
-      margin-top: 14px;
-    }
-
-    button, .download-link {
-      border: none;
-      border-radius: 12px;
-      padding: 0 18px;
-      height: 46px;
-      font-size: 15px;
-      cursor: pointer;
-      transition: 0.15s;
-      font-weight: bold;
-      text-decoration: none;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    button:hover, .download-link:hover {
-      transform: translateY(-2px);
-      opacity: 0.9;
-    }
-
-    button:disabled {
-      cursor: not-allowed;
-      opacity: 0.6;
-      transform: none;
-    }
-
-    .make-btn {
-      background: #42a5f5;
-      color: white;
-    }
-
-    .clear-btn {
-      background: #b0bec5;
-      color: white;
-    }
-
-    .download-link {
-      background: #7e57c2;
-      color: white;
-    }
-
-    .hidden { display: none; }
-
-    .status {
-      min-height: 24px;
-      margin-top: 14px;
-      color: #555;
-      font-size: 14px;
-    }
-
-    .result-box {
-      margin-top: 20px;
-      padding: 18px;
-      border-radius: 18px;
-      background: #f7f9fb;
-      border: 1px solid #edf1f5;
-    }
-
-    audio {
-      width: 100%;
-      margin-top: 10px;
-    }
-
-    .help {
-      margin-top: 12px;
-      font-size: 13px;
-      color: #777;
-      line-height: 1.6;
-    }
-
-    @media (max-width: 700px) {
-      .option-box { grid-template-columns: 1fr; }
-      .button-row { justify-content: stretch; }
-      button, .download-link { width: 100%; }
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <h1>AI TTS 음성 변환기</h1>
-    <div class="subtitle">텍스트를 AI 음성 mp3 파일로 변환합니다</div>
-
-    <div class="info">
-      현재 구조: GitHub Pages 화면 → Google Apps Script 서버 → OpenAI TTS API → mp3 음성 반환<br />
-      API Key는 index.html에 들어가지 않고 Apps Script의 스크립트 속성에 저장됩니다.
-    </div>
-
-    <div class="option-box">
-      <select id="modelSelect">
-        <option value="tts-1">tts-1 빠른 생성</option>
-        <option value="tts-1-hd">tts-1-hd 고품질</option>
-      </select>
-
-      <select id="voiceSelect">
-        <option value="alloy">alloy</option>
-        <option value="echo">echo</option>
-        <option value="fable">fable</option>
-        <option value="onyx">onyx</option>
-        <option value="nova">nova</option>
-        <option value="shimmer">shimmer</option>
-      </select>
-
-      <input id="speedInput" type="number" min="0.25" max="4.0" step="0.05" value="1.0" placeholder="속도" />
-    </div>
-
-    <div>
-      <div class="label">변환할 텍스트</div>
-      <textarea id="textInput" placeholder="음성으로 바꿀 문장을 입력하세요. 예: 안녕하세요. 오늘은 Firebase와 OpenAI API를 활용한 웹페이지 제작을 배워보겠습니다."></textarea>
-    </div>
-
-    <div class="button-row">
-      <button class="clear-btn" id="clearBtn">초기화</button>
-      <button class="make-btn" id="makeBtn">음성 만들기</button>
-    </div>
-
-    <div id="status" class="status"></div>
-
-    <div id="resultBox" class="result-box hidden">
-      <div class="label">생성된 음성</div>
-      <audio id="audioPlayer" controls></audio>
-      <div class="button-row">
-        <a id="downloadLink" class="download-link" href="#" download="tts-audio.mp3">mp3 다운로드</a>
-      </div>
-    </div>
-
-    <div class="help">
-      긴 문장은 생성 시간이 오래 걸릴 수 있습니다. 처음에는 짧은 문장으로 테스트해보세요.<br />
-      속도는 0.25부터 4.0까지 조절할 수 있습니다.
-    </div>
-  </div>
-
-  <script>
-    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxDNMIktE288seW2Mr5YgksYFeAP3SNl8YyQZFa1DuvD0N_8pjRLDmxkZBYyQ4WGPmt/exec';
-
-    const textInput = document.getElementById('textInput');
-    const modelSelect = document.getElementById('modelSelect');
-    const voiceSelect = document.getElementById('voiceSelect');
-    const speedInput = document.getElementById('speedInput');
-    const makeBtn = document.getElementById('makeBtn');
-    const clearBtn = document.getElementById('clearBtn');
-    const statusBox = document.getElementById('status');
-    const resultBox = document.getElementById('resultBox');
-    const audioPlayer = document.getElementById('audioPlayer');
-    const downloadLink = document.getElementById('downloadLink');
-
-    makeBtn.addEventListener('click', makeSpeech);
-    clearBtn.addEventListener('click', clearPage);
-
-    textInput.addEventListener('keydown', function(event) {
-      if (event.key === 'Enter' && event.ctrlKey) {
-        makeSpeech();
-      }
+    // 1. ChatGPT API 호출 (Apps Script 경유)
+    const res = await fetch(GAS_WEB_APP_URL, {
+      method: 'POST',
+      body: JSON.stringify({ type: "chat", question: q })
     });
+    const data = await res.json();
 
-    async function makeSpeech() {
-      const text = textInput.value.trim();
-      const model = modelSelect.value;
-      const voice = voiceSelect.value;
-      const speed = Number(speedInput.value || 1.0);
+    if (data.answer) {
+      const reply = data.answer;
+      lastAiAnswerText = reply;
+      aiAnswer.textContent = reply;
+      setStatus('답변 수신 완료! 수학 기호 변환 및 TTS를 준비합니다.');
 
-      if (!text) {
-        alert('음성으로 변환할 텍스트를 입력해주세요.');
-        return;
-      }
+      // 🌟 [핵심 연동] AI 답변을 수학 변환기 입력창에 자동으로 주입
+      mathInput.value = reply;
+      
+      // 🌟 수학 변환 함수를 강제로 실행시켜 결과창에 기호(ex: ∫, √)가 뜨게 만듦
+      convertMathText(); 
 
-      if (speed < 0.25 || speed > 4.0) {
-        alert('속도는 0.25부터 4.0 사이로 입력해주세요.');
-        return;
-      }
+      // 🌟 답변을 받자마자 사용자가 버튼을 누르지 않아도 자동으로 TTS 재생 시작
+      playAutomaticTTS(reply);
 
-      try {
-        setLoading(true);
-        resultBox.classList.add('hidden');
-        statusBox.textContent = 'Apps Script 서버에 TTS 요청을 보내는 중입니다.';
-
-        const response = await fetch(APPS_SCRIPT_URL, {
-          method: 'POST',
-          body: JSON.stringify({
-            type: 'tts',
-            text: text,
-            model: model,
-            voice: voice,
-            speed: speed
-          })
-        });
-
-        const data = await response.json();
-
-        if (data.error) {
-          throw new Error(data.error);
-        }
-
-        if (!data.audioBase64) {
-          throw new Error('음성 데이터를 받지 못했습니다.');
-        }
-
-        const audioUrl = base64ToAudioUrl(data.audioBase64, 'audio/mpeg');
-
-        audioPlayer.src = audioUrl;
-        downloadLink.href = audioUrl;
-        downloadLink.download = makeFileName();
-        resultBox.classList.remove('hidden');
-        statusBox.textContent = '음성 생성 완료';
-      } catch (error) {
-        console.error(error);
-        statusBox.textContent = '요청 실패';
-        alert('오류가 발생했습니다.\n\n' + error.message);
-      } finally {
-        setLoading(false);
-      }
+    } else if (data.error) {
+      aiAnswer.textContent = `오류 발생:\n${data.error}`;
+      setStatus('API 에러 응답 수신');
+      askAiBtn.disabled = false;
     }
+  } catch (err) {
+    console.error(err);
+    aiAnswer.textContent = "통신 실패 오류가 발생했습니다. URL 또는 CORS 세팅을 확인하세요.";
+    setStatus('서버 통신 실패');
+    askAiBtn.disabled = false;
+  }
+});
 
-    function base64ToAudioUrl(base64, mimeType) {
-      const byteCharacters = atob(base64);
-      const byteArrays = [];
+// 수동으로 다시 듣고 싶을 때 사용하는 버튼 이벤트
+ttsBtn.addEventListener('click', () => {
+  if(lastAiAnswerText) playAutomaticTTS(lastAiAnswerText);
+});
 
-      for (let offset = 0; offset < byteCharacters.length; offset += 512) {
-        const slice = byteCharacters.slice(offset, offset + 512);
-        const byteNumbers = new Array(slice.length);
+// 🔊 TTS 자동 재생 처리 함수
+async function playAutomaticTTS(textToSpeak) {
+  try {
+    ttsBtn.disabled = true;
+    setStatus('AI 답변을 음성으로 변환 중입니다...');
 
-        for (let i = 0; i < slice.length; i++) {
-          byteNumbers[i] = slice.charCodeAt(i);
-        }
+    // 대량의 텍스트 오버플로우 방지를 위해 앞부분 200자만 안전하게 슬라이싱
+    const cleanText = textToSpeak.substring(0, 200);
 
-        const byteArray = new Uint8Array(byteNumbers);
-        byteArrays.push(byteArray);
-      }
+    const res = await fetch(GAS_WEB_APP_URL, {
+      method: 'POST',
+      body: JSON.stringify({ type: "tts", text: cleanText })
+    });
+    const data = await res.json();
 
-      const blob = new Blob(byteArrays, { type: mimeType });
-      return URL.createObjectURL(blob);
+    if (data.audioBase64) {
+      setStatus('🔊 AI 답변 음성 재생 중...');
+      const audioBytes = Uint8Array.from(atob(data.audioBase64), c => c.charCodeAt(0));
+      const blob = new Blob([audioBytes], { type: 'audio/mp3' });
+      const audioUrl = URL.createObjectURL(blob);
+      const audio = new Audio(audioUrl);
+      
+      audio.play();
+      
+      // 음성 재생이 완전히 끝나면 다시 질문 버튼 활성화
+      audio.onended = () => {
+        setStatus('음성 안내가 완료되었습니다.');
+        ttsBtn.disabled = false;
+        askAiBtn.disabled = false;
+      };
+    } else {
+      setStatus('TTS 변환 실패 (오디오 데이터 없음)');
+      ttsBtn.disabled = false;
+      askAiBtn.disabled = false;
     }
-
-    function makeFileName() {
-      const now = new Date();
-      const year = now.getFullYear();
-      const month = String(now.getMonth() + 1).padStart(2, '0');
-      const day = String(now.getDate()).padStart(2, '0');
-      const hour = String(now.getHours()).padStart(2, '0');
-      const minute = String(now.getMinutes()).padStart(2, '0');
-      return `tts-${year}${month}${day}-${hour}${minute}.mp3`;
-    }
-
-    function setLoading(isLoading) {
-      makeBtn.disabled = isLoading;
-      makeBtn.textContent = isLoading ? '생성 중...' : '음성 만들기';
-    }
-
-    function clearPage() {
-      textInput.value = '';
-      statusBox.textContent = '';
-      audioPlayer.removeAttribute('src');
-      downloadLink.href = '#';
-      resultBox.classList.add('hidden');
-    }
-  </script>
-</body>
-</html>
-
-
+  } catch (err) {
+    console.error(err);
+    setStatus('TTS 재생 중 통신 오류 발생');
+    ttsBtn.disabled = false;
+    askAiBtn.disabled = false;
+  }
+}
